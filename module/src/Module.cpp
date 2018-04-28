@@ -11,86 +11,64 @@
  *****************************************************************************/
 
 #include "Module.h"
+#include "CLuaModule.h"
 #include "luaimports.h"
-#include <signal.h>
+#include "ILuaModuleManager.h"
+#include <cstring>
+#include <cstdio>
 
-ILuaModuleManager10 *pModuleManager = NULL;
-bool ms_bInitWorked = false;
+static lua_CFunction        pAddEvent = nullptr;
+static lua_CFunction        pTriggerEvent = nullptr;
+static CLuaModule          *pWebsocketModule = nullptr;
+static ILuaModuleManager10 *pModuleManager = nullptr;
+static const std::string    kModuleName    { "Websocket module" };
+static const std::string    kModuleAuthor  { "Octalype"         };
+static const float          kModuleVersion { 1.0f               };
 
-// Initialisation function (module entrypoint)
-MTAEXPORT bool InitModule ( ILuaModuleManager10 *pManager, char *szModuleName, char *szAuthor, float *fVersion )
+static int Websocket_Open(lua_State *luaVM)
 {
-	pModuleManager = pManager;
-
-	// Set the module info
-	strncpy ( szModuleName, MODULE_NAME, MAX_INFO_LENGTH );
-	strncpy ( szAuthor, MODULE_AUTHOR, MAX_INFO_LENGTH );
-	(*fVersion) = MODULE_VERSION;
-
-    if ( !ImportLua() )
-    {
-        return false;
-    }
-
-#ifdef WIN32
-    WSADATA wsaData;
-    if ( WSAStartup ( MAKEWORD ( 2, 2 ), &wsaData ) != 0 )
-    {
-        pModuleManager->ErrorPrintf("[Sockets] Can't start Winsock, aborting...");
-        return false;
-    }
-#else
-    // Avoid process termination on broken pipe
-    signal(SIGPIPE, SIG_IGN);
-#endif
-
-    ms_bInitWorked = true;
-	return true;
+    lua_pushliteral(luaVM, "Websocket_Open");
+    return 1;
 }
 
-
-MTAEXPORT void RegisterFunctions ( lua_State * luaVM )
+MTAEXPORT bool InitModule(ILuaModuleManager10 *pManager, char *szModuleName, char *szAuthor, float *fVersion)
 {
-    if ( !ms_bInitWorked )
+    pModuleManager = pManager;
+
+    std::strncpy(szModuleName, kModuleName.c_str(), kMaxInfoLength);
+    std::strncpy(szAuthor, kModuleAuthor.c_str(), kMaxInfoLength);
+    *fVersion = kModuleVersion;
+
+    pWebsocketModule = new CLuaModule("websocket");
+    pWebsocketModule->AddMethod("open", &Websocket_Open);
+
+    return ImportLua();
+}
+
+MTAEXPORT void RegisterFunctions(lua_State *L)
+{
+    if (!pModuleManager || !pWebsocketModule || !L)
         return;
 
-	if ( pModuleManager && luaVM )
-	{
-        // Register functions
-        pModuleManager->RegisterFunction ( luaVM, "sockOpen",  CFunctions::sockOpen );
-        pModuleManager->RegisterFunction ( luaVM, "sockWrite", CFunctions::sockWrite );
-        pModuleManager->RegisterFunction ( luaVM, "sockClose", CFunctions::sockClose );
-
-        // Add events
-        CFunctions::AddEvent ( luaVM, "onSockOpened" );
-        CFunctions::AddEvent ( luaVM, "onSockData" );
-        CFunctions::AddEvent ( luaVM, "onSockClosed" );
-	}
+    pWebsocketModule->Register(L);
 }
 
-
-MTAEXPORT bool DoPulse ( void )
+MTAEXPORT bool DoPulse(void)
 {
-    CSocketManager::DoPulse();
-	return true;
+    return true;
 }
 
-
-MTAEXPORT void ResourceStopped ( lua_State * luaVM )
+MTAEXPORT void ResourceStopped(lua_State *luaVM)
 {
-    CSocketManager::ResourceStopped( luaVM );
 }
 
-
-MTAEXPORT bool ShutdownModule ( void )
+MTAEXPORT bool ShutdownModule(void)
 {
-    // Stop all sockets before shutting down the module
-    CSocketManager::HandleStop ( );
+    if (pWebsocketModule)
+    {
+        delete pWebsocketModule;
+        pWebsocketModule = nullptr;
+    }
 
-#ifdef WIN32
-    // Cleanup Winsock stuff
-    WSACleanup ( );
-#endif
-
-	return true;
+    return true;
 }

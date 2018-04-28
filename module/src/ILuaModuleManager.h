@@ -14,14 +14,9 @@
 
 #pragma once
 
-#define MAX_INFO_LENGTH 128
+const int kMaxInfoLength = 128;
 
-extern "C"
-{
-    #include "lua.h"
-    #include "lualib.h"
-    #include "lauxlib.h"
-}
+#include "lua.hpp"
 #include <string>
 
 #ifndef __CChecksum_H

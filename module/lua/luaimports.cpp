@@ -29,12 +29,8 @@
  */
 #include <dlfcn.h>
 #include <stdarg.h>
-#include "include/Common.h"
-#include "include/ILuaModuleManager.h"
-#include "lauxlib.h"
-#include "luaconf.h"
-#include "lua.h"
-#include "lualib.h"
+#include "ILuaModuleManager.h"
+#include "lua.hpp"
 
 /* This file extracts the lua function addresses from the server core to avoid lua gc crashes */
 
@@ -202,13 +198,14 @@ static void* pluaL_addlstring = 0;
 static void* pluaL_addstring = 0;
 static void* pluaL_addvalue = 0;
 static void* pluaL_pushresult = 0;
+static void* plua_getmainstate = 0;
 
 
 #define SAFE_IMPORT(x) \
   p ## x = dlsym(dl, #x); \
   if (p ## x == 0) \
   { \
-    pModuleManager->Printf("[Sockets] Unable to import " #x ": %s\n", dlerror()); \
+    pModuleManager->Printf("Unable to import " #x ": %s\n", dlerror()); \
     return false; \
   }
 
@@ -217,14 +214,14 @@ extern "C"
 #endif
 bool ImportLua()
 {
-#ifdef ANY_x64
+#ifdef __x86_64
   void* dl = dlopen("x64/deathmatch.so", RTLD_NOW | RTLD_NOLOAD);
 #else
   void* dl = dlopen("mods/deathmatch/deathmatch.so", RTLD_NOW | RTLD_NOLOAD);
 #endif
   if (!dl)
   {
-    pModuleManager->ErrorPrintf("[Sockets] Unable to open deathmatch.so: %s\n", dlerror());
+    pModuleManager->ErrorPrintf("Unable to open deathmatch.so: %s\n", dlerror());
     return false;
   }
 
@@ -390,6 +387,9 @@ bool ImportLua()
   SAFE_IMPORT(luaL_addstring);
   SAFE_IMPORT(luaL_addvalue);
   SAFE_IMPORT(luaL_pushresult);
+
+  SAFE_IMPORT(lua_getmainstate);
+
     return true;
 }
 #undef SAFE_IMPORT
@@ -578,6 +578,8 @@ typedef void (*luaL_addlstring_t)(luaL_Buffer *B, const char *s, size_t l);
 typedef void (*luaL_addstring_t)(luaL_Buffer *B, const char *s);
 typedef void (*luaL_addvalue_t)(luaL_Buffer *B);
 typedef void (*luaL_pushresult_t)(luaL_Buffer *B);
+
+typedef lua_State* (*lua_getmainstate_t)(lua_State* L);
 
 
 /** functions **/
@@ -1244,6 +1246,11 @@ void (luaL_addvalue) (luaL_Buffer *B)
 void (luaL_pushresult) (luaL_Buffer *B)
 {
   LCALL(luaL_pushresult, B);
+}
+
+lua_State* (lua_getmainstate) (lua_State* L)
+{
+	LRET(lua_getmainstate, L);
 }
 
 #ifdef __cplusplus

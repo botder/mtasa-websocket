@@ -8,11 +8,16 @@ project "Module"
         ["Headers"] = "src/**.h",
         ["Sources"] = "src/**.cpp",
         ["Lua"] = { "lua/**.cpp", "lua/**.h" },
+		["*"] = "premake5.lua",
     }
 
     files {
-        "**.h",
-        "**.cpp",
+        "premake5.lua",
+        "lua/**.h",
+        "lua/**c.pp",
+        "src/Module.h",
+        "src/Module.cpp",
+        "src/ILuaModuleManager.h",
     }
 
     includedirs {
@@ -20,24 +25,17 @@ project "Module"
         "../vendor/websocketpp/include",
     }
 
-    filter "system:windows"
-        excludes { "lua/luaimports.cpp", "lua/luaimports.h" }
-        defines { "LUA_BUILD_AS_DLL" }
+    -- defines { "LUA_BUILD_AS_DLL" }
 
-    -- Link to platform and configuration dependent lua5.1 library 
-    filter { "system:windows", "platforms:x32", "configurations:Release" }
-        links { "libs/x32/lua5.1" }
+    filter { "system:windows", "platforms:x86" }
+        links { "lib/lua5.1.lib" }
+        
+    filter { "system:windows", "platforms:x64" }
+        links { "lib/lua5.1_64.lib" }
 
-    filter { "system:windows", "platforms:x32", "configurations:Debug" }
-        links { "libs/x32/lua5.1_d" }
+    filter "system:not linux"
+        excludes { "lua/luaimports.cpp" }
 
-    filter { "system:windows", "platforms:x64", "configurations:Release" }
-        links { "libs/x64/lua5.1" }
-
-    filter { "system:windows", "platforms:x64", "configurations:Debug" }
-        links { "libs/x64/lua5.1_d" }
-
-    -- Set platform dependent target directory
     filter "platforms:x32"
         binpath "x32"
 
