@@ -8,7 +8,7 @@ project "Module"
         ["Headers"] = "src/**.h",
         ["Sources"] = "src/**.cpp",
         ["Lua"] = { "lua/**.cpp", "lua/**.h" },
-		["*"] = "premake5.lua",
+        ["*"] = "premake5.lua",
     }
 
     files {
@@ -17,6 +17,8 @@ project "Module"
         "lua/**c.pp",
         "src/Module.h",
         "src/Module.cpp",
+        "src/CLuaModule.h",
+        "src/CLuaModule.cpp",
         "src/ILuaModuleManager.h",
     }
 
@@ -24,8 +26,6 @@ project "Module"
         "lua", 
         "../vendor/websocketpp/include",
     }
-
-    -- defines { "LUA_BUILD_AS_DLL" }
 
     filter { "system:windows", "platforms:x86" }
         links { "lib/lua5.1.lib" }
