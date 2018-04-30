@@ -9,45 +9,32 @@
  *  Multi Theft Auto is available from https://www.multitheftauto.com/
  *
  *****************************************************************************/
-
 #pragma once
 
-extern "C"
-{
-    #include "lua.h"
-}
-
-#include "CLuaArgument.h"
 #include <vector>
+#include <memory>
+#include <tuple>
 
-using namespace std;
+struct lua_State;
+class CLuaArgument;
+using CLuaArgumentPtr = std::shared_ptr<CLuaArgument>;
 
 class CLuaArguments
 {
 public:
-    inline                                              CLuaArguments       ( void )                {};
-                                                        CLuaArguments       ( const CLuaArguments& Arguments );
-    inline                                              ~CLuaArguments      ( void )                { DeleteArguments (); };
+    CLuaArguments() = default;
+    CLuaArguments(lua_State *L, int i = 1);
+    void Push(CLuaArgumentPtr argument);
+    void ReadStack(lua_State *L, int i = 1);
+    unsigned int PushStack(lua_State *L) const;
+    void Clear();
+    size_t Size() const;
+    CLuaArgumentPtr Get(size_t index) const;
+    CLuaArgumentPtr operator[](size_t index) const;
 
-    const CLuaArguments&                                operator =          ( const CLuaArguments& Arguments );
-
-    void                                                ReadArguments       ( lua_State* luaVM, unsigned int uiIndexBegin = 1 );
-    void                                                PushArguments       ( lua_State* luaVM ) const;
-    void                                                PushArguments       ( CLuaArguments& Arguments );
-    bool                                                Call                ( lua_State* luaVM, const char* szFunction ) const;
-
-    CLuaArgument*                                       PushNil             ( void );
-    CLuaArgument*                                       PushBoolean         ( bool bBool );
-    CLuaArgument*                                       PushNumber          ( double dNumber );
-    CLuaArgument*                                       PushString          ( const char* szString );
-    CLuaArgument*                                       PushUserData        ( void* pUserData );
-
-    void                                                DeleteArguments     ( void );
-
-    inline unsigned int                                 Count               ( void ) const          { return static_cast < unsigned int > ( m_Arguments.size () ); };
-    inline vector < CLuaArgument* > ::const_iterator    IterBegin           ( void )                { return m_Arguments.begin (); };
-    inline vector < CLuaArgument* > ::const_iterator    IterEnd             ( void )                { return m_Arguments.end (); };
+public:
+    static CLuaArgumentPtr GetArgument(lua_State *L, int i);
 
 private:
-    vector < CLuaArgument* >                            m_Arguments;
+    std::vector<CLuaArgumentPtr> m_Arguments;
 };

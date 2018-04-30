@@ -15,11 +15,8 @@ project "Module"
         "premake5.lua",
         "lua/**.h",
         "lua/**c.pp",
-        "src/Module.h",
-        "src/Module.cpp",
-        "src/CLuaModule.h",
-        "src/CLuaModule.cpp",
-        "src/ILuaModuleManager.h",
+        "src/**.h",
+        "src/**.cpp",
     }
 
     includedirs {

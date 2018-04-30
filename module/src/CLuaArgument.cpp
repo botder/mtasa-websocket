@@ -9,289 +9,253 @@
  *  Multi Theft Auto is available from https://www.multitheftauto.com/
  *
  *****************************************************************************/
-
-#ifdef WIN32
-    #pragma warning (disable : 4996) // DISABLE: 'strcpy': This function or variable may be unsafe.
-#endif
-
 #include "CLuaArgument.h"
-#include <assert.h>
-#include <cstring>
+#include "lua.hpp"
 
-using namespace std;
-
-CLuaArgument::CLuaArgument ( void )
+unsigned int CLuaArgument::Push(lua_State *)
 {
-    m_szString = NULL;
-    m_iType = LUA_TNIL;
+    return 0;
 }
 
-
-CLuaArgument::CLuaArgument ( bool bBool )
+int CLuaArgument::GetType()
 {
-    m_szString = NULL;
-    m_iType = LUA_TBOOLEAN;
-    m_bBoolean = bBool;
+    return LUA_TNONE;
 }
 
-
-CLuaArgument::CLuaArgument ( double dNumber )
+bool CLuaArgument::HasValue()
 {
-    m_szString = NULL;
-    m_iType = LUA_TNUMBER;
-    m_Number = dNumber;
+    return GetType() != LUA_TNONE;
 }
 
-
-CLuaArgument::CLuaArgument ( const char* szString )
+unsigned int CLuaNil::Push(lua_State *L)
 {
-    assert ( szString );
-
-    m_iType = LUA_TSTRING;
-    m_szString = new char [strlen ( szString ) + 1];
-    strcpy ( m_szString, szString );
+    lua_pushnil(L);
+    return 1;
 }
 
-
-CLuaArgument::CLuaArgument ( void* pUserData )
+int CLuaNil::GetType()
 {
-    m_szString = NULL;
-    m_iType = LUA_TLIGHTUSERDATA;
-    m_pLightUserData = pUserData;
+    return LUA_TNIL;
 }
 
-
-CLuaArgument::CLuaArgument ( const CLuaArgument& Argument )
+unsigned int CLuaNumber::Push(lua_State *L)
 {
-    // Initialize and call our = on the argument
-    m_szString = NULL;
-    operator= ( Argument );
+    lua_pushnumber(L, static_cast<lua_Number>(m_Value));
+    return 1;
 }
 
-
-CLuaArgument::CLuaArgument ( lua_State* luaVM, unsigned int uiArgument )
+int CLuaNumber::GetType()
 {
-    // Read the argument out of the lua VM
-    m_szString = NULL;
-    Read ( luaVM, uiArgument );
+    return LUA_TNUMBER;
 }
 
-
-CLuaArgument::~CLuaArgument ( void )
+unsigned int CLuaBoolean::Push(lua_State *L)
 {
-    // Eventually destroy our string
-    if ( m_szString )
+    lua_pushboolean(L, m_Value);
+    return 1;
+}
+
+int CLuaBoolean::GetType()
+{
+    return LUA_TBOOLEAN;
+}
+
+unsigned int CLuaString::Push(lua_State *L)
+{
+    lua_pushlstring(L, m_Value.c_str(), m_Value.size());
+    return 1;
+}
+
+int CLuaString::GetType()
+{
+    return LUA_TSTRING;
+}
+
+unsigned int CLuaUserData::Push(lua_State *L)
+{
+    lua_pushlightuserdata(L, m_Value);
+    return 1;
+}
+
+int CLuaUserData::GetType()
+{
+    return LUA_TLIGHTUSERDATA;
+}
+
+CLuaReference::CLuaReference()
+    : CLuaType(LUA_NOREF)
+    , m_Type(LUA_TNONE)
+    , m_State(nullptr)
+{
+}
+
+CLuaReference::CLuaReference(lua_State *L, int i)
+    : CLuaReference()
+{
+    m_State = L;
+    const int top = lua_gettop(L);
+
+    if (i < 0)
+        i += top + 1;
+
+    lua_pushvalue(L, i);
+    m_Type = lua_type(L, -1);
+    m_Value = luaL_ref(L, LUA_REGISTRYINDEX);
+}
+
+CLuaReference::~CLuaReference()
+{
+    if (m_State && m_Type != LUA_TNONE)
+        luaL_unref(m_State, LUA_REGISTRYINDEX, m_Value);
+}
+
+CLuaReference::CLuaReference(CLuaReference &&other)
+    : CLuaReference()
+{
+    *this = std::move(other);
+}
+
+CLuaReference &CLuaReference::operator=(CLuaReference &&other)
+{
+    m_Value = other.m_Value;
+    m_Type = other.m_Type;
+    m_State = other.m_State;
+    other.m_Value = LUA_NOREF;
+    other.m_Type = LUA_TNONE;
+    other.m_State = nullptr;
+    return *this;
+}
+
+int CLuaReference::GetType()
+{
+    return LUA_TNONE;
+}
+
+int CLuaReference::GetReferenceType()
+{
+    return m_Type;
+}
+
+unsigned int CLuaTable::Push(lua_State *L)
+{
+    if (L != m_State || m_Type != LUA_TTABLE)
     {
-        delete [] m_szString;
-    }
-}
-
-
-const CLuaArgument& CLuaArgument::operator = ( const CLuaArgument& Argument )
-{
-    // Destroy our old string if neccessary
-    if ( m_szString )
-    {
-        delete [] m_szString;
-        m_szString = NULL;
-    }
-
-    // Set our variable equally to the copy class
-    m_iType = Argument.m_iType;
-    switch ( m_iType )
-    {
-        case LUA_TBOOLEAN:
-        {
-            m_bBoolean = Argument.m_bBoolean;
-            break;
-        }
-
-        case LUA_TLIGHTUSERDATA:
-        {
-            m_pLightUserData = Argument.m_pLightUserData;
-            break;
-        }
-
-        case LUA_TNUMBER:
-        {
-            m_Number = Argument.m_Number;
-            break;
-        }
-
-        case LUA_TSTRING:
-        {
-            if ( Argument.m_szString )
-            {
-                m_szString = new char [strlen ( Argument.m_szString ) + 1];
-                strcpy ( m_szString, Argument.m_szString );
-            }
-           
-            break;
-        }
-
-        default: break;
-    }
-
-    // Return the given class allowing for chaining
-    return Argument;
-}
-
-
-bool CLuaArgument::operator == ( const CLuaArgument& Argument )
-{
-    // If the types differ, they're not matching
-    if ( Argument.m_iType != m_iType )
-        return false;
-
-    // Compare the variables depending on the type
-    switch ( m_iType )
-    {
-        case LUA_TBOOLEAN:
-        {
-            return m_bBoolean == Argument.m_bBoolean;
-        }
-
-        case LUA_TLIGHTUSERDATA:
-        {
-            return m_pLightUserData == Argument.m_pLightUserData;
-        }
-
-        case LUA_TNUMBER:
-        {
-            return m_Number == Argument.m_Number;
-        }
-
-        case LUA_TSTRING:
-        {
-            if ( m_szString )
-            {
-                if ( Argument.m_szString )
-                    return strcmp ( m_szString, Argument.m_szString ) == 0;
-                else
-                    return false;
-            }
-            else
-            {
-                return Argument.m_szString == NULL;
-            }
-        }
+        // Copy from origin Lua state
+        lua_pushnil(L);
+        return 1;
     }
 
-    return true;
+    lua_rawgeti(L, LUA_REGISTRYINDEX, m_Value);
+    return 1;
 }
 
-
-bool CLuaArgument::operator != ( const CLuaArgument& Argument )
+int CLuaTable::GetType()
 {
-    return !( operator == ( Argument ) );
+    return LUA_TTABLE;
 }
 
-
-void CLuaArgument::Read ( lua_State* luaVM, unsigned int uiArgument )
+unsigned int CLuaFunction::Push(lua_State *L)
 {
-    // Eventually delete our previous string
-    if ( m_szString )
+    if (m_Type != LUA_TFUNCTION)
     {
-        delete [] m_szString;
-        m_szString = NULL;
+        lua_pushnil(L);
+        return 1;
     }
 
-    // Grab the argument type
-    m_iType = lua_type ( luaVM, uiArgument );
-    if ( m_iType != LUA_TNONE )
+    lua_rawgeti(m_State, LUA_REGISTRYINDEX, m_Value);
+
+    if (lua_iscfunction(m_State, -1))
     {
-        // Read out the content depending on the type
-        switch ( m_iType )
-        {
-            case LUA_TNIL:
-                break;
+        const lua_CFunction function = lua_tocfunction(m_State, -1);
 
-            case LUA_TBOOLEAN:
-            {
-                m_bBoolean = lua_toboolean ( luaVM, uiArgument ) ? true:false;
-                break;
-            }
+        if (function)
+            lua_pushcfunction(L, function);
+        else
+            lua_pushnil(L);
 
-            case LUA_TLIGHTUSERDATA:
-            {
-                m_pLightUserData = lua_touserdata ( luaVM, uiArgument );
-                break;
-            }
-
-            case LUA_TNUMBER:
-            {
-                m_Number = lua_tonumber ( luaVM, uiArgument );
-                break;
-            }
-
-            case LUA_TSTRING:
-            {
-                // Grab the lua string and its size
-                const char* szLuaString = lua_tostring ( luaVM, uiArgument );
-                size_t sizeLuaString = strlen ( szLuaString );
-
-                // Allocate our buffer
-                m_szString = new char [sizeLuaString + 1];
-                strcpy ( m_szString, szLuaString );
-                break;
-            }
-
-            default:
-            {
-                m_iType = LUA_TNONE;
-                break;
-            }
-        }
+        lua_pop(m_State, 1);
+        return 1;
     }
+    else if (lua_isfunction(m_State, -1))
+    {
+        return 1;
+    }
+
+    if (L != m_State)
+    {
+        // You can't copy a Lua function from one state to another
+        lua_pushnil(L);
+        return 1;
+    }
+
+    return 1;
 }
 
-
-void CLuaArgument::Push ( lua_State* luaVM ) const
+int CLuaFunction::GetType()
 {
-    // Got any type?
-    if ( m_iType != LUA_TNONE )
+    return LUA_TFUNCTION;
+}
+
+CLuaArguments CLuaFunction::Call(const CLuaArguments &arguments)
+{
+    return Call(m_State, arguments);
+}
+
+CLuaArguments CLuaFunction::Call(lua_State *L, const CLuaArguments &arguments)
+{
+    const int top = lua_gettop(L);
+    
+    if (Push(L) != 1)
     {
-        // Push it depending on the type
-        switch ( m_iType )
-        {
-            case LUA_TNIL:
-            {
-                lua_pushnil ( luaVM );
-                break;
-            }
-
-            case LUA_TBOOLEAN:
-            {
-                lua_pushboolean ( luaVM, m_bBoolean );
-                break;
-            }
-
-            case LUA_TLIGHTUSERDATA:
-            {
-                lua_pushlightuserdata ( luaVM, m_pLightUserData );
-                break;
-            }
-
-            case LUA_TNUMBER:
-            {
-                lua_pushnumber ( luaVM, m_Number );
-                break;
-            }
-
-            case LUA_TSTRING:
-            {
-                // Push the string if we got any
-                if ( m_szString )
-                {
-                    lua_pushstring ( luaVM, m_szString );
-                }
-                else
-                {
-                    lua_pushstring ( luaVM, "" );
-                }
-
-                break;
-            }
-        }
+        lua_settop(L, top);
+        return CLuaArguments{};
     }
+
+    if (!lua_isfunction(L, -1))
+    {
+        lua_settop(L, top);
+        return CLuaArguments{};
+    }
+
+    const unsigned int nargs = arguments.PushStack(L);
+    const int errorCode = lua_pcall(L, nargs, LUA_MULTRET, NULL);
+
+    if (errorCode != 0)
+    {
+        lua_settop(L, top);
+        return CLuaArguments{};
+    }
+
+    CLuaArguments results{L, top + 1};
+    lua_settop(L, top);
+
+    return results;
+}
+
+CLuaArguments CLuaFunction::operator()(const CLuaArguments &arguments)
+{
+    return Call(m_State, arguments);
+}
+
+CLuaArguments CLuaFunction::operator()(lua_State *L, const CLuaArguments &arguments)
+{
+    return Call(L, arguments);
+}
+
+unsigned int CLuaThread::Push(lua_State *L)
+{
+    if (L != m_State || m_Type != LUA_TTHREAD)
+    {
+        // Copy from origin Lua state
+        lua_pushnil(L);
+        return 1;
+    }
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, m_Value);
+    return 1;
+}
+
+int CLuaThread::GetType()
+{
+    return LUA_TTHREAD;
 }

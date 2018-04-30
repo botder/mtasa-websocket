@@ -2,7 +2,7 @@
  *
  *  PROJECT:     Websocket module
  *  LICENSE:     See LICENSE in the top level directory
- *  FILE:        Common.h
+ *  FILE:        CLuaVM.h
  *  COPYRIGHT:   Copyright (c) 2003-2018 MTA
  *               Grand Theft Auto (c) 2002-2003 Rockstar North
  *
@@ -11,27 +11,16 @@
  *****************************************************************************/
 #pragma once
 
-#include "lua.hpp"
+#include "CLuaArgument.h"
 
-#define MAX_ARGUMENTS 10
+struct lua_State;
 
-struct FunctionArguments
+class CLuaVM
 {
-	lua_State* luaVM;
-	unsigned char nArguments;
-	unsigned char Type[10];
-	void*	Arguments[10];
+public:
+    CLuaVM(lua_State *L);
+    CLuaFunction GetFunction(const char *functionName);
+
+private: 
+    lua_State *m_State;
 };
-
-namespace FunctionArgumentType
-{
-	enum
-	{
-		TYPE_NUMBER = 1,
-		TYPE_STRING = 2,
-		TYPE_LIGHTUSERDATA = 3,
-		TYPE_BOOLEAN = 4,
-		TYPE_NIL = 5,
-		TYPE_TABLE = 6
-	};
-}

@@ -11,16 +11,18 @@
  *****************************************************************************/
 
 #include "Module.h"
+#include "CLuaVM.h"
 #include "CLuaModule.h"
+#include "CLuaArgumentsBuilder.h"
 #include "luaimports.h"
 #include "ILuaModuleManager.h"
+#include "lua.hpp"
 #include <cstring>
 #include <cstdio>
+#include <string>
 
-static lua_CFunction        pAddEvent = nullptr;
-static lua_CFunction        pTriggerEvent = nullptr;
-static CLuaModule          *pWebsocketModule = nullptr;
-static ILuaModuleManager10 *pModuleManager = nullptr;
+static CLuaModule           *pWebsocketModule = nullptr;
+static ILuaModuleManager10  *pModuleManager = nullptr;
 static const std::string    kModuleName    { "Websocket module" };
 static const std::string    kModuleAuthor  { "Octalype"         };
 static const float          kModuleVersion { 1.0f               };
@@ -50,7 +52,26 @@ MTAEXPORT void RegisterFunctions(lua_State *L)
     if (!pModuleManager || !pWebsocketModule || !L)
         return;
 
+    lua_settop(L, 0);
     pWebsocketModule->Register(L);
+
+    CLuaVM vm{L};
+    CLuaArgumentsBuilder builder;
+    builder.PushString("onWebsocketOpen");
+    CLuaFunction outputServerLog = vm.GetFunction("outputServerLog");
+    CLuaArguments results = outputServerLog(builder.Get());
+
+    // auto [success] = results.Get<bool>();
+
+    if (results.Size() == 1)
+    {
+        bool& success = reinterpret_cast<CLuaBoolean &>(*results[0]).GetValue();
+
+        if (success)
+            pModuleManager->Printf("outputServerLog() success!\n");
+        else
+            pModuleManager->Printf("outputServerLog() failed!\n");
+    }
 }
 
 MTAEXPORT bool DoPulse(void)
