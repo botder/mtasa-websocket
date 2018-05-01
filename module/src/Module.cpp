@@ -10,68 +10,43 @@
  *
  *****************************************************************************/
 
+#pragma warning(disable: 4267)
+
 #include "Module.h"
-#include "CLuaVM.h"
-#include "CLuaModule.h"
-#include "CLuaArgumentsBuilder.h"
 #include "luaimports.h"
 #include "ILuaModuleManager.h"
-#include "lua.hpp"
+#include <sol/sol.hpp>
 #include <cstring>
 #include <cstdio>
 #include <string>
 
-static CLuaModule           *pWebsocketModule = nullptr;
-static ILuaModuleManager10  *pModuleManager = nullptr;
-static const std::string    kModuleName    { "Websocket module" };
-static const std::string    kModuleAuthor  { "Octalype"         };
-static const float          kModuleVersion { 1.0f               };
+static const std::string kModuleName    { "Websocket module" };
+static const std::string kModuleAuthor  { "Octalype"         };
+static const float       kModuleVersion { 1.0f               };
 
-static int Websocket_Open(lua_State *luaVM)
+static std::string Websocket_Open()
 {
-    lua_pushliteral(luaVM, "Websocket_Open");
-    return 1;
+    return std::string{"Websocket_Open"};
 }
 
-MTAEXPORT bool InitModule(ILuaModuleManager10 *pManager, char *szModuleName, char *szAuthor, float *fVersion)
+MTAEXPORT bool InitModule(ILuaModuleManager10 *, char *moduleName, char *moduleAuthor, float *moduleVersion)
 {
-    pModuleManager = pManager;
-
-    std::strncpy(szModuleName, kModuleName.c_str(), kMaxInfoLength);
-    std::strncpy(szAuthor, kModuleAuthor.c_str(), kMaxInfoLength);
-    *fVersion = kModuleVersion;
-
-    pWebsocketModule = new CLuaModule("websocket");
-    pWebsocketModule->AddMethod("open", &Websocket_Open);
+    std::strncpy(moduleName, kModuleName.c_str(), kMaxInfoLength);
+    std::strncpy(moduleAuthor, kModuleAuthor.c_str(), kMaxInfoLength);
+    *moduleVersion = kModuleVersion;
 
     return ImportLua();
 }
 
-MTAEXPORT void RegisterFunctions(lua_State *L)
+MTAEXPORT void RegisterFunctions(lua_State *luaState)
 {
-    if (!pModuleManager || !pWebsocketModule || !L)
+    if (!luaState)
         return;
 
-    lua_settop(L, 0);
-    pWebsocketModule->Register(L);
-
-    CLuaVM vm{L};
-    CLuaArgumentsBuilder builder;
-    builder.PushString("onWebsocketOpen");
-    CLuaFunction outputServerLog = vm.GetFunction("outputServerLog");
-    CLuaArguments results = outputServerLog(builder.Get());
-
-    // auto [success] = results.Get<bool>();
-
-    if (results.Size() == 1)
-    {
-        bool& success = reinterpret_cast<CLuaBoolean &>(*results[0]).GetValue();
-
-        if (success)
-            pModuleManager->Printf("outputServerLog() success!\n");
-        else
-            pModuleManager->Printf("outputServerLog() failed!\n");
-    }
+    lua_settop(luaState, 0);
+    sol::state_view lua{luaState};
+    sol::table websocket = lua.create_named_table("websocket");
+    websocket.set_function("open", &Websocket_Open);
 }
 
 MTAEXPORT bool DoPulse(void)
@@ -85,11 +60,5 @@ MTAEXPORT void ResourceStopped(lua_State *luaVM)
 
 MTAEXPORT bool ShutdownModule(void)
 {
-    if (pWebsocketModule)
-    {
-        delete pWebsocketModule;
-        pWebsocketModule = nullptr;
-    }
-
     return true;
 }
