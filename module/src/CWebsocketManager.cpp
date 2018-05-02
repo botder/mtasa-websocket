@@ -12,6 +12,9 @@
 #include "CWebsocketManager.h"
 #include <iostream>
 
+namespace asio = websocketpp::lib::asio;
+using ContextPtr = websocketpp::lib::shared_ptr<asio::ssl::context>;
+
 CWebsocketManager::CWebsocketManager()
 {
     m_Endpoint.clear_access_channels(websocketpp::log::alevel::all);
@@ -31,6 +34,28 @@ CWebsocketManager::CWebsocketManager()
 
     m_Endpoint.set_fail_handler([this](websocketpp::connection_hdl hdl) {
         this->OnError(hdl);
+    });
+
+    m_Endpoint.set_tls_init_handler([this](websocketpp::connection_hdl hdl) -> ContextPtr {
+        ConnectionPtr con = m_Endpoint.get_con_from_hdl(hdl);
+
+        if (!con)
+        {
+            std::cout << "CWebsocketManager::OnTLSInit failed to retrieve connection from HDL\n";
+            return nullptr;
+        }
+
+        ContextPtr ctx = websocketpp::lib::make_shared<asio::ssl::context>(asio::ssl::context::sslv23_client);
+        
+        boost::system::error_code ec;
+        ctx->set_options(asio::ssl::context::default_workarounds | 
+                         asio::ssl::context::no_sslv2 |
+                         asio::ssl::context::no_sslv3 |
+                         asio::ssl::context::single_dh_use, ec);
+
+        std::cout << "CWebsocketManager::OnTLSInit\n";
+
+        return ctx;
     });
 
     m_Endpoint.init_asio();

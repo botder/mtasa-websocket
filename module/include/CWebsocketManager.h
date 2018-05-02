@@ -23,7 +23,7 @@
 
 class CWebsocketManager
 {
-    using Client        = websocketpp::client<websocketpp::config::asio_client>;
+    using Client        = websocketpp::client<websocketpp::config::asio_tls_client>;
     using ConnectionPtr = Client::connection_ptr;
     using Thread        = websocketpp::lib::thread;
     using ThreadPtr     = websocketpp::lib::shared_ptr<Thread>;
