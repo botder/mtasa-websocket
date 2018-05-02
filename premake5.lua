@@ -27,7 +27,6 @@ solution "Websocket"
     filter "system:windows"
         defines { "WIN32", "_WIN32" }
 		flags { "StaticRuntime" }
-        toolset "v140"
 
     filter "configurations:Debug"
         defines { "DEBUG" }
