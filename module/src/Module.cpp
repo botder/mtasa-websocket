@@ -3,8 +3,6 @@
  *  PROJECT:     Websocket module
  *  LICENSE:     See LICENSE in the top level directory
  *  FILE:        Module.cpp
- *  COPYRIGHT:   Copyright (c) 2003-2018 MTA
- *               Grand Theft Auto (c) 2002-2003 Rockstar North
  *
  *  Multi Theft Auto is available from https://www.multitheftauto.com/
  *
@@ -13,20 +11,23 @@
 #include "Module.h"
 #include "luaimports.h"
 #include "ILuaModuleManager.h"
-#include "CWebsocket.h"
-#include "CWebsocketManager.h"
+#include "CConnection.h"
+#include "CConnectionManager.h"
+
 #include <sol.hpp>
-#include <functional>
 #include <cstring>
 #include <cstdio>
 #include <string>
+#include <memory>
 
 static const std::string kModuleName    { "Websocket module" };
 static const std::string kModuleAuthor  { "Octalype"         };
-static const float       kModuleVersion { 1.0f               };
+static const float       kModuleVersion { WSM_VERSION };
+
+static const std::string USER_AGENT = WSM_USER_AGENT;
 
 ILuaModuleManager10 *g_ModuleManager = nullptr;
-CWebsocketManager *g_WebsocketManager = nullptr;
+std::unique_ptr<CConnectionManager> g_ConnectionManager = nullptr;
 
 MTAEXPORT bool InitModule(ILuaModuleManager10 *moduleManager, char *moduleName, char *moduleAuthor, float *moduleVersion)
 {
@@ -38,13 +39,15 @@ MTAEXPORT bool InitModule(ILuaModuleManager10 *moduleManager, char *moduleName, 
 
     try
     {
-        g_WebsocketManager = new CWebsocketManager;
+        g_ConnectionManager = std::make_unique<CConnectionManager>();
     }
     catch (std::exception &e)
     {
         moduleManager->ErrorPrintf("Failed to create an instance of CWebsocketManager in InitModule: %s", e.what());
         return false;
     }
+
+    std::cout << "Using user-agent: " << USER_AGENT << '\n';
 
     return ImportLua();
 }
@@ -57,12 +60,12 @@ MTAEXPORT void RegisterFunctions(lua_State *luaState)
     lua_settop(luaState, 0);
     sol::state_view lua{luaState};
 
-    lua.new_usertype<CWebsocket>("websocket",
+    /*lua.new_usertype<CWebsocket>("websocket",
         sol::constructors<CWebsocket(), CWebsocket(const std::string&)>(),
         "connect", &CWebsocket::Connect,
         "write", &CWebsocket::Write,
         "close", &CWebsocket::Close
-    );
+    );*/
 
     sol::function addEvent = lua["addEvent"];
 
@@ -85,5 +88,6 @@ MTAEXPORT void ResourceStopped(lua_State *luaVM)
 
 MTAEXPORT bool ShutdownModule(void)
 {
+    g_ConnectionManager.reset();
     return true;
 }

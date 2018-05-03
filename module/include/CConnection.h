@@ -2,9 +2,7 @@
  *
  *  PROJECT:     Websocket module
  *  LICENSE:     See LICENSE in the top level directory
- *  FILE:        CWebsocket.h
- *  COPYRIGHT:   Copyright (c) 2003-2018 MTA
- *               Grand Theft Auto (c) 2002-2003 Rockstar North
+ *  FILE:        CConnection.h
  *
  *  Multi Theft Auto is available from https://www.multitheftauto.com/
  *
@@ -14,18 +12,14 @@
 #include <string>
 #include <websocketpp/common/connection_hdl.hpp>
 
-class CWebsocket
+class CConnection
 {
-public:
-    CWebsocket();
-    CWebsocket(const std::string& uri);
-    ~CWebsocket();
+    friend class CConnectionManager;
 
 public:
-    bool Connect(const std::string& uri);
-    bool Write(const std::string& message);
-    bool Close();
+    CConnection(websocketpp::connection_hdl&& hdl);
+    websocketpp::connection_hdl GetHandle() const { return m_Handle; }
 
 private:
-    websocketpp::connection_hdl m_HDL;
+    websocketpp::connection_hdl m_Handle;
 };

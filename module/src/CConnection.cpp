@@ -2,16 +2,14 @@
  *
  *  PROJECT:     Websocket module
  *  LICENSE:     See LICENSE in the top level directory
- *  FILE:        lua.hpp
+ *  FILE:        CConnection.cpp
  *
  *  Multi Theft Auto is available from https://www.multitheftauto.com/
  *
  *****************************************************************************/
-#pragma once
+#include "CConnection.h"
 
-extern "C"
+CConnection::CConnection(websocketpp::connection_hdl&& hdl)
 {
-#   include <lua/lua.h>
-#   include <lua/lualib.h>
-#   include <lua/lauxlib.h>
+    m_Handle = std::forward<websocketpp::connection_hdl>(hdl);
 }

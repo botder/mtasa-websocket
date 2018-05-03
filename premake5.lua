@@ -14,7 +14,7 @@ solution "Websocket"
     }
 
     cppdialect "C++14"
-	characterset "MBCS"
+    characterset "MBCS"
     pic "On"
     symbols "On"
 
