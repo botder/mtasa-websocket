@@ -38,7 +38,14 @@ project "Module"
         "src/**.cpp",
     }
 
-    defines { "LUA_BUILD_AS_DLL" }
+    defines {
+        "LUA_BUILD_AS_DLL",
+        "_WEBSOCKETPP_CPP11_FUNCTIONAL_",
+        "_WEBSOCKETPP_CPP11_RANDOM_DEVICE_",
+        "_WEBSOCKETPP_CPP11_SYSTEM_ERROR_",
+        "_WEBSOCKETPP_CPP11_MEMORY_",
+        "_WEBSOCKETPP_CPP11_STL_",
+    }
 
     includedirs {
         "include", 

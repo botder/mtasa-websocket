@@ -31,4 +31,5 @@
 #define WSM_USER_AGENT   "MTA:SA Server - Websocket (" WSM_VERSION_TEXT ") " BOOST_PLATFORM " (" BOOST_COMPILER ", Boost/" WSM_QUOTE(BOOST_VERSION) ")"
 
 extern class ILuaModuleManager10 *g_ModuleManager;
-extern std::unique_ptr<class CConnectionManager> g_ConnectionManager;
+extern std::shared_ptr<class WebsocketManager> g_WebsocketManager;
+extern std::unique_ptr<class ResourceManager> g_ResourceManager;
