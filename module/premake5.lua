@@ -25,17 +25,32 @@ project "Module"
     targetprefix "ml_"
 
     vpaths {
-        ["Sources"] = "src/**.cpp",
-        ["Headers"] = { "include/**.h", "include/**.hpp" },
-        ["*"]       = { "premake5.lua", "vcpkg.lua" },
+        ["*"]   = { "premake5.lua", "vcpkg.lua" },
+        ["PCH"] = { "stdafx.h", "stdafx.cpp" },
+        ["MTA"] = { "src/ILuaModuleManager.h", "src/lua.hpp", "src/luaimports.cpp", "src/luaimports.h" },
+        ["Code"] = { 
+            "src/Module.cpp",           "src/Module.h",
+            "src/Resource.cpp",         "src/Resource.h",
+            "src/ResourceManager.cpp",  "src/ResourceManager.h",
+            "src/WebsocketManager.cpp",  "src/WebsocketManager.h",
+            "src/LuaWebsocket.cpp",     "src/LuaWebsocket.h",
+            "src/Websocket.cpp",        "src/Websocket.h",
+            "src/EndpointManager.cpp",  "src/EndpointManager.h",
+            "src/ElementID.h",
+        }
     }
+
+    pchheader "stdafx.h"
+    pchsource "stdafx.cpp"
 
     files {
         "vcpkg.lua",
         "premake5.lua",
-        "include/**.h",
-        "include/**.hpp",
+        "stdafx.h",
+        "stdafx.cpp",
         "src/**.cpp",
+        "src/**.h",
+        "src/**.hpp",
     }
 
     defines {
@@ -48,7 +63,8 @@ project "Module"
     }
 
     includedirs {
-        "include", 
+        ".",
+        "src", 
         "../vendor/lua/include",
     }
 

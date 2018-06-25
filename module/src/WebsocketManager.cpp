@@ -2,97 +2,71 @@
  *
  *  PROJECT:     Websocket module
  *  LICENSE:     See LICENSE in the top level directory
- *  FILE:        CConnectionManager.cpp
+ *  FILE:        WebsocketManager.cpp
  *
  *  Multi Theft Auto is available from https://www.multitheftauto.com/
  *
  *****************************************************************************/
+#include "stdafx.h"
 #include "WebsocketManager.h"
-#include "Module.h"
 
-#include <algorithm>
+#include <limits>
+#include <cassert>
 
-using SSLContextPtr = std::shared_ptr<websocketpp::lib::asio::ssl::context>;
-static SSLContextPtr ContextHandler(websocketpp::connection_hdl hdl);
-static const std::string USER_AGENT = WSM_USER_AGENT;
+static constexpr int MaxWebsockets = std::numeric_limits<std::uint16_t>::max();
+static constexpr int IndexRecyclingThreshold = 1024;
 
 WebsocketManager::WebsocketManager()
 {
-	m_Client.init_asio();
-	m_Client.start_perpetual();
-	m_Client.clear_access_channels(websocketpp::log::alevel::all);
-	m_Client.clear_error_channels(websocketpp::log::elevel::all);
-	m_Client.set_tls_init_handler(&ContextHandler);
-	m_Client.set_user_agent(USER_AGENT);
-
-	m_Thread = std::thread{ &Client::run, &m_Client };
+    m_Data.reserve(MaxWebsockets);
 }
 
-WebsocketManager::~WebsocketManager()
+ElementID WebsocketManager::Create()
 {
-	m_Client.stop_perpetual();
+    std::size_t index;
 
-	for (ConnectionMetaMap::reference pair : m_ConnectionMeta)
-	{
-		const ConnectionPtr& con = pair.first;
+    if (m_FreeIndices.size() > IndexRecyclingThreshold
+        || (m_Data.size() == m_Data.capacity() && !m_FreeIndices.empty()))
+    {
+        index = m_FreeIndices.front();
+        m_FreeIndices.pop_front();
+    }
+    else
+    {
+        if (m_Data.size() == m_Data.capacity())
+            return ElementID::Invalid;
 
-		if (con->get_state() != websocketpp::session::state::open)
-			continue;
+        m_Data.emplace_back();
+        index = m_Data.size() - 1;
+    }
 
-		std::error_code ec;
-		con->close(websocketpp::close::status::going_away, "", ec);
-
-		pair.second->m_Manager.reset();
-		pair.second->m_HDL.reset();
-		pair.second->onClose();
-	}
-
-	ConnectionMetaMap{}.swap(m_ConnectionMeta);
-	m_Thread.join();
+    return ElementID(index, m_Data[index].m_Generation);
 }
 
-WebsocketManager::MetaPtr WebsocketManager::CreateWebsocket(const std::string& uri)
+Websocket* WebsocketManager::Get(ElementID id)
 {
-	std::error_code ec;
-	ConnectionPtr con = m_Client.get_connection(uri, ec);
+    if (!IsAlive(id))
+        return nullptr;
 
-	if (ec)
-		return nullptr;
-
-	MetaPtr meta = std::make_shared<WebsocketMeta>();
-	meta->m_Manager = shared_from_this();
-	meta->m_HDL = con->get_handle();
-	m_ConnectionMeta.emplace(std::make_pair(con, meta));
-
-	con->set_open_handler(std::bind(&WebsocketMeta::onOpen, meta));
-	con->set_close_handler(std::bind(&WebsocketMeta::onClose, meta));
-	con->set_fail_handler(std::bind(&WebsocketMeta::onFail, meta));
-	con->set_message_handler(std::bind(&WebsocketMeta::onMessage, meta, std::placeholders::_2));
-
-	return meta;
+    return &m_Data[id.GetIndex()].m_Websocket;
 }
 
-WebsocketManager::ConnectionPtr WebsocketManager::GetConnection(websocketpp::connection_hdl hdl)
+bool WebsocketManager::IsAlive(ElementID id)
 {
-	return m_Client.get_con_from_hdl(hdl);
+    if (id == ElementID::Invalid)
+        return false;
+
+    const std::uint16_t index = id.GetIndex();
+
+    if (index >= m_Data.size())
+        return false;
+
+    return m_Data[index].m_Generation == id.GetGeneration();
 }
 
-void WebsocketManager::Connect(ConnectionPtr con)
+void WebsocketManager::Destroy(ElementID id)
 {
-	m_Client.connect(con);
-}
-
-SSLContextPtr ContextHandler(websocketpp::connection_hdl hdl)
-{
-	namespace asio = websocketpp::lib::asio;
-	SSLContextPtr ctx = std::make_shared<asio::ssl::context>(asio::ssl::context::sslv23_client);
-
-	boost::system::error_code ec;
-
-	ctx->set_options(asio::ssl::context::default_workarounds |
-		asio::ssl::context::no_sslv2 |
-		asio::ssl::context::no_sslv3 |
-		asio::ssl::context::single_dh_use, ec);
-
-	return ctx;
+    assert(IsAlive(id));
+    m_Data[id.GetIndex()].m_Generation += 1;
+    m_FreeIndices.emplace_back(id.GetIndex());
 }

@@ -1250,7 +1250,7 @@ void (luaL_pushresult) (luaL_Buffer *B)
 
 lua_State* (lua_getmainstate) (lua_State* L)
 {
-	LRET(lua_getmainstate, L);
+    LRET(lua_getmainstate, L);
 }
 
 #ifdef __cplusplus

@@ -9,13 +9,12 @@
  *****************************************************************************/
 #pragma once
 
-#include <memory>
 #include <boost/version.hpp>
 
 #ifdef WIN32
-#	define MTAEXPORT extern "C" __declspec(dllexport)
+#    define MTAEXPORT extern "C" __declspec(dllexport)
 #else
-#	define MTAEXPORT extern "C"
+#    define MTAEXPORT extern "C"
 #endif
 
 #define WSM_VERSION_MAJOR 1
@@ -30,6 +29,8 @@
 #define WSM_VERSION_TEXT WSM_QUOTE(WSM_VERSION_MAJOR) "." WSM_QUOTE(WSM_VERSION_MINOR) "." WSM_QUOTE(WSM_VERSION_PATCH)
 #define WSM_USER_AGENT   "MTA:SA Server - Websocket (" WSM_VERSION_TEXT ") " BOOST_PLATFORM " (" BOOST_COMPILER ", Boost/" WSM_QUOTE(BOOST_VERSION) ")"
 
-extern class ILuaModuleManager10 *g_ModuleManager;
-extern std::shared_ptr<class WebsocketManager> g_WebsocketManager;
-extern std::unique_ptr<class ResourceManager> g_ResourceManager;
+extern class ILuaModuleManager10 *g_pModuleManager;
+
+extern std::unique_ptr<class EndpointManager>  g_pEndpointManager;
+extern std::unique_ptr<class WebsocketManager> g_pWebsocketManager;
+extern std::unique_ptr<class ResourceManager>  g_pResourceManager;

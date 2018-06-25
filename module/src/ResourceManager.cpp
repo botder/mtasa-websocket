@@ -7,52 +7,52 @@
  *  Multi Theft Auto is available from https://www.multitheftauto.com/
  *
  *****************************************************************************/
+#include "stdafx.h"
 #include "ResourceManager.h"
-#include "LuaWebsocket.h"
+#include "Resource.h"
 
-#include <algorithm>
+#include "ILuaModuleManager.h"
+#include "Module.h"
 
 ResourceManager::~ResourceManager()
 {
-	for (ResourceWebsocketsMap::reference pair : m_ResourceWebsockets)
-	{
-		for (LuaWebsocket* luaWebsocket : pair.second)
-			luaWebsocket->OnResourceStop();
-	}
+    g_pModuleManager->Printf("ResourceManager::~ResourceManager()\n");
+
+    if (!m_Resources.empty())
+    {
+        bool wtf = true;
+    }
 }
 
-void ResourceManager::AddWebsocket(const Resource& resource, LuaWebsocket& luaWebsocket)
+ void ResourceManager::OnResourceStart(lua_State* pLuaVM)
 {
-	auto it = m_ResourceWebsockets.find(resource);
+    ResourcePtrMap::iterator it = m_Resources.find(pLuaVM);
 
-	if (it == m_ResourceWebsockets.end())
-		return;
+    if (it != m_Resources.end())
+        return;
 
-	it->second.emplace_back(&luaWebsocket);
+    ResourcePtr pResource;
+
+    try
+    {
+        pResource = std::make_shared<Resource>(pLuaVM);
+    }
+    catch (std::bad_alloc&)
+    {
+        return;
+    }
+
+    pResource->OnResourceStart();
+    m_Resources.emplace(ResourcePtrMap::value_type(pLuaVM, std::move(pResource)));
 }
 
-void ResourceManager::RemoveWebsocket(const Resource& resource, const LuaWebsocket& luaWebsocket)
+void ResourceManager::OnResourceStop(lua_State* pLuaVM)
 {
-	auto it = m_ResourceWebsockets.find(resource);
+    ResourcePtrMap::iterator it = m_Resources.find(pLuaVM);
 
-	if (it == m_ResourceWebsockets.end())
-		return;
+    if (it == m_Resources.end())
+        return;
 
-	it->second.erase(std::remove(it->second.begin(), it->second.end(), &luaWebsocket));
-
-	if (it->second.empty())
-		m_ResourceWebsockets.erase(it);
-}
-
-void ResourceManager::OnResourceStop(const Resource& resource)
-{
-	auto it = m_ResourceWebsockets.find(resource);
-
-	if (it == m_ResourceWebsockets.end())
-		return;
-
-	for (LuaWebsocket* luaWebsocket : it->second)
-		luaWebsocket->OnResourceStop();
-
-	m_ResourceWebsockets.erase(it);
+    it->second->OnResourceStop();
+    m_Resources.erase(it);
 }

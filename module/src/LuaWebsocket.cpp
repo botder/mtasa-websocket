@@ -7,175 +7,161 @@
  *  Multi Theft Auto is available from https://www.multitheftauto.com/
  *
  *****************************************************************************/
+#include "stdafx.h"
 #include "LuaWebsocket.h"
-#include "WebsocketManager.h"
-#include "ResourceManager.h"
 #include "Module.h"
+#include "WebsocketManager.h"
 
-#include <cstring>
-
-LuaWebsocket::LuaWebsocket(Resource resource)
-	: m_WebsocketState(WebsocketState::Closed)
-	, m_Resource(resource)
-	, m_ResourceState(ResourceState::Running)
-	, m_URI("")
+LuaWebsocket::LuaWebsocket()
+    : m_WebsocketID(g_pWebsocketManager->Create())
 {
-	g_ResourceManager->AddWebsocket(resource, *this);
+    Websocket* pWebsocket = g_pWebsocketManager->Get(m_WebsocketID);
+
+    if (pWebsocket)
+    {
+        pWebsocket->SetOpenHandler([this]() {
+            if (m_OpenHandler)
+                HandleInvokeResult("open", m_OpenHandler(this));
+        });
+
+        pWebsocket->SetCloseHandler([this](int code, const std::string& reason) {
+            if (m_CloseHandler)
+                HandleInvokeResult("close", m_CloseHandler(this, code, reason));
+        });
+
+        pWebsocket->SetFailHandler([this](int code, const std::string& reason) {
+            if (m_FailHandler)
+                HandleInvokeResult("fail", m_FailHandler(this, code, reason));
+        });
+
+        pWebsocket->SetMessageHandler([this](int opcode, const std::string& payload) {
+            if (m_MessageHandler)
+                HandleInvokeResult("message", m_MessageHandler(this, opcode, payload));
+        });
+    }
 }
 
-LuaWebsocket::LuaWebsocket(Resource resource, const std::string & uri)
-	: LuaWebsocket(resource)
+LuaWebsocket::LuaWebsocket(const std::string& uri)
+    : LuaWebsocket()
 {
-	m_URI = uri;
+    Websocket* pWebsocket = g_pWebsocketManager->Get(m_WebsocketID);
+
+    if (pWebsocket)
+        pWebsocket->SetURI(uri);
 }
 
 LuaWebsocket::~LuaWebsocket()
 {
-	if (m_Resource)
-		g_ResourceManager->RemoveWebsocket(m_Resource, *this);
+    Websocket* pWebsocket = g_pWebsocketManager->Get(m_WebsocketID);
+
+    if (pWebsocket)
+    {
+        pWebsocket->SetOpenHandler(nullptr);
+        pWebsocket->SetCloseHandler(nullptr);
+        pWebsocket->SetFailHandler(nullptr);
+        pWebsocket->SetMessageHandler(nullptr);
+        pWebsocket->Close();
+        g_pWebsocketManager->Destroy(m_WebsocketID);
+        m_WebsocketID = ElementID::Invalid;
+    }
+}
+
+void LuaWebsocket::SetURI(const std::string& uri) const
+{
+    Websocket* pWebsocket = g_pWebsocketManager->Get(m_WebsocketID);
+
+    if (!pWebsocket)
+        return;
+
+    pWebsocket->SetURI(uri);
+}
+
+sol::optional<std::string> LuaWebsocket::GetURI() const
+{
+    Websocket* pWebsocket = g_pWebsocketManager->Get(m_WebsocketID);
+
+    if (!pWebsocket)
+        return sol::nullopt;
+
+    return pWebsocket->GetURI();
 }
 
 bool LuaWebsocket::Open()
 {
-	if (m_ResourceState != ResourceState::Running)
-		return false;
+    Websocket* pWebsocket = g_pWebsocketManager->Get(m_WebsocketID);
 
-	if (m_Websocket)
-		return m_Websocket->Open(m_URI);
+    if (!pWebsocket)
+        return false;
 
-	m_Websocket = g_WebsocketManager->CreateWebsocket(m_URI);
-
-	if (m_Websocket)
-	{
-		m_WebsocketState = WebsocketState::Connecting;
-
-		m_Websocket->SetOpenHandler([this]() {
-			m_WebsocketState = WebsocketState::Connected;
-
-			if (m_OpenHandler.valid())
-				HandleInvokeResult("open", m_OpenHandler(this));
-		});
-
-		m_Websocket->SetCloseHandler([this](int code, const std::string& message) {
-			m_WebsocketState = WebsocketState::Closed;
-
-			if (m_CloseHandler.valid())
-				HandleInvokeResult("close", m_CloseHandler(this, code, message));
-		});
-
-		m_Websocket->SetFailHandler([this](int code, const std::string& message) {
-			m_WebsocketState = WebsocketState::Closed;
-
-			if (m_FailHandler.valid())
-				HandleInvokeResult("fail", m_FailHandler(this, code, message));
-		});
-
-		m_Websocket->SetMessageHandler([this](int opcode, const std::string& payload) {
-			if (m_MessageHandler.valid())
-				HandleInvokeResult("message", m_MessageHandler(this, opcode, payload));
-		});
-
-		m_Websocket->Connect();
-	}
-
-	return m_Websocket != nullptr;
+    return pWebsocket->Open();
 }
 
-bool LuaWebsocket::Close(sol::optional<std::string> reason)
+bool LuaWebsocket::Close(sol::optional<std::string> reason, sol::optional<int> code)
 {
-	if (m_ResourceState != ResourceState::Running)
-		return false;
+    Websocket* pWebsocket = g_pWebsocketManager->Get(m_WebsocketID);
 
-	if (!m_Websocket)
-		return false;
+    if (!pWebsocket)
+        return false;
 
-	m_WebsocketState = WebsocketState::Closing;
-	m_Websocket->Close(reason);
+    websocketpp::close::status::value closeStatus = websocketpp::close::status::going_away;
 
-	return true;
+    if (code)
+        closeStatus = static_cast<websocketpp::close::status::value>(code.value());
+
+    if (reason)
+        return pWebsocket->Close(reason.value(), closeStatus);
+    else
+        return pWebsocket->Close(closeStatus);
 }
 
-bool LuaWebsocket::Send(const std::string& message, sol::optional<FrameOpcode> opcode)
+bool LuaWebsocket::Send(const std::string& payload, sol::optional<FrameOpcode> opcode)
 {
-	if (m_ResourceState == ResourceState::Stopped)
-		return false;
+    Websocket* pWebsocket = g_pWebsocketManager->Get(m_WebsocketID);
 
-	if (!m_Websocket)
-		return false;
+    if (!pWebsocket)
+        return false;
 
-	return m_Websocket->Write(message, static_cast<WebsocketMeta::FrameOpcode>(opcode.value_or(FrameOpcode::Text)));
-}
+    websocketpp::frame::opcode::value frameOpcode = websocketpp::frame::opcode::text;
 
-LuaWebsocket::WebsocketState LuaWebsocket::GetWebsocketState() const
-{
-	return m_WebsocketState;
-}
+    if (opcode)
+        frameOpcode = static_cast<websocketpp::frame::opcode::value>(opcode.value());
 
-LuaWebsocket::ResourceState LuaWebsocket::GetResourceState() const
-{
-	return m_ResourceState;
-}
-
-void LuaWebsocket::SetURI(const std::string& uri)
-{
-	m_URI = uri;
-}
-
-const std::string& LuaWebsocket::GetURI() const
-{
-	return m_URI;
+    return pWebsocket->Send(payload, frameOpcode);
 }
 
 bool LuaWebsocket::AddEventHandler(const char* eventName, sol::protected_function handler)
 {
-	if (m_ResourceState == ResourceState::Stopped)
-		return false;
+    if (!std::strcmp(eventName, "open"))
+        m_OpenHandler = handler;
+    else if (!std::strcmp(eventName, "close"))
+        m_CloseHandler = handler;
+    else if (!std::strcmp(eventName, "fail"))
+        m_FailHandler = handler;
+    else if (!std::strcmp(eventName, "message"))
+        m_MessageHandler = handler;
+    else if (!std::strcmp(eventName, "error"))
+        m_ErrorHandler = handler;
+    else
+        return false;
 
-	if (!std::strcmp(eventName, "open"))
-		m_OpenHandler = handler;
-	else if (!std::strcmp(eventName, "close"))
-		m_CloseHandler = handler;
-	else if (!std::strcmp(eventName, "fail"))
-		m_FailHandler = handler;
-	else if (!std::strcmp(eventName, "message"))
-		m_MessageHandler = handler;
-	else if (!std::strcmp(eventName, "error"))
-		m_ErrorHandler = handler;
-	else
-		return false;
-
-	return true;
+    return true;
 }
 
-void LuaWebsocket::OnResourceStop()
+LuaWebsocket::State LuaWebsocket::GetState() const
 {
-	m_ResourceState = ResourceState::Stopping;
+    Websocket* pWebsocket = g_pWebsocketManager->Get(m_WebsocketID);
 
-	if (m_Websocket)
-	{
-		Close(std::string{""});
+    if (!pWebsocket)
+       return State::Invalid;
 
-		if (m_CloseHandler.valid() && m_WebsocketState != WebsocketState::Closed)
-		{
-			m_WebsocketState = WebsocketState::Closed;
-			HandleInvokeResult("close", m_CloseHandler(this, -1, "Resource is stopping"));
-		}
-	}
-
-	m_Resource = nullptr;
-	m_ResourceState = ResourceState::Stopped;
-	m_OpenHandler = sol::nil;
-	m_CloseHandler = sol::nil;
-	m_FailHandler = sol::nil;
-	m_MessageHandler = sol::nil;
-	m_ErrorHandler = sol::nil;
+    return static_cast<State>(pWebsocket->GetState());
 }
 
 void LuaWebsocket::HandleInvokeResult(const char* eventName, sol::protected_function_result result)
 {
-	if (m_ErrorHandler.valid() && !result.valid())
-	{
-		sol::error err = result;
-		m_ErrorHandler(this, eventName, err.what());
-	}
+    if (m_ErrorHandler.valid() && !result.valid())
+    {
+        sol::error err = result;
+        m_ErrorHandler(eventName, err.what());
+    }
 }
